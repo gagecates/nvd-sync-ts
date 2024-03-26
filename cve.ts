@@ -59,7 +59,9 @@ export const handleCves = async (
           allCves.push(details);
         }
 
-        console.log(`first 4 RESULTS: ${allCves.slice(0, 4)}`);
+        console.log(
+          `first 4 RESULTS: ${JSON.stringify(allCves.slice(0, 4), null, 2)}`,
+        );
         continueFetching = false;
 
         const total = data.totalResults;

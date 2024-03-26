@@ -27,6 +27,13 @@ type Weakness = {
   }[];
 };
 
+export const getVendorProduct = (cpe: string): [string, string] => {
+  const parts = cpe.split(":");
+  const vendor = parts[3];
+  const product = parts[4];
+  return [vendor, product];
+};
+
 export const getPaddedVersion = (version: string): string => {
   if (version === "-" || version === "") {
     return version;
@@ -185,17 +192,19 @@ export const determineCveCpes = async (configs: any = []): Promise<Cpes> => {
             for (const vulnerableVersion of cpeInfoList) {
               const { cpe, vendor, product } = vulnerableVersion;
               if (!vulnProducts.includes(cpe)) vulnProducts.push(cpe);
+              if (!vulnConfigs.includes(cpe)) vulnConfigs.push(cpe);
               if (!vendors.includes(vendor)) vendors.push(vendor);
               if (!products.includes(product)) products.push(product);
             }
           } else {
             // If the cpeMatch did not have version start/end, add the cpe string as is to each array
+            const [vendor, product] = getVendorProduct(cpeUri.criteria);
             if (!vulnProducts.includes(cpeUri.criteria))
               vulnProducts.push(cpeUri.criteria);
-            if (!vendors.includes(cpeUri.criteria))
-              vendors.push(cpeUri.criteria);
-            if (!products.includes(cpeUri.criteria))
-              products.push(cpeUri.criteria);
+            if (!vulnConfigs.includes(cpeUri.criteria))
+              vulnConfigs.push(cpeUri.criteria);
+            if (!vendors.includes(vendor)) vendors.push(vendor);
+            if (!products.includes(product)) products.push(product);
           }
         }
       }
