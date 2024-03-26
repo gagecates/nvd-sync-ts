@@ -15,51 +15,16 @@ type CvssData = {
   severity: string;
 };
 
-interface CweDescription {
+type CweDescription = {
   lang: string;
   value: string;
-}
+};
 
 type Weakness = {
   description: {
     lang: string;
     value: string;
   }[];
-};
-
-export const getVendorProduct = (cpe: string): [string, string] => {
-  const parts = cpe.split(":");
-  const vendor = parts[3];
-  const product = parts[4];
-  return [vendor, product];
-};
-
-export const getPaddedVersion = (version: string): string => {
-  if (version === "-" || version === "") {
-    return version;
-  }
-
-  version = version.replace("\\(", ".").replace("\\)", ".").replace(/\.$/, "");
-  const retList: string[] = [];
-  const splittedVersion = version.split(".");
-
-  try {
-    parseInt(splittedVersion[splittedVersion.length - 1]);
-    // Can be parsed to an integer, proceed normally
-    splittedVersion.forEach((v) => {
-      try {
-        retList.push(parseInt(v).toString().padStart(5, "0"));
-      } catch (error) {
-        retList.push(v.padStart(5, "0"));
-      }
-    });
-  } catch (error) {
-    // Last part of version cannot be cast to an int
-    // Handle accordingly...
-    // Similar to your Python logic, adapted for TypeScript
-  }
-
-  return retList.join(".");
 };
 
 type CpeUri = {
@@ -70,6 +35,81 @@ type CpeUri = {
   versionEndIncluding?: string;
 };
 
+// get vendor and product name from full cpe string e.g. cpe:2.3:a:analogx:proxy:4.13:*:*:*:*:*:*:*
+export const getVendorProduct = (cpe: string): [string, string] => {
+  const parts = cpe.split(":");
+  const vendor = parts[3];
+  const product = parts[4];
+  return [vendor, product];
+};
+
+// get padded version of original version string to help with query lookups e.g. 2.0.2 = 00002.00000.00002
+// referenced: https://github.com/cve-search/CveXplore/blob/6f052361318f90bf518d8552f1177a41cca285cb/CveXplore/core/database_maintenance/api_handlers.py#L43
+// testing results: (2.5.1-k9 > 00002.00005.00001) (3.0.sp2a > 00003.00000.sp2a) (2.5 > 00002.00005)
+export const getPaddedVersion = (version: string): string => {
+  if (version === "-" || version === "") {
+    return version;
+  }
+
+  // Normalizing edge cases
+  version = version
+    .replace(/\\\(/g, ".")
+    .replace(/\\\)/g, ".")
+    .replace(/\.$/, "");
+
+  let retList: string[] = [];
+  const splittedVersion = version.split(".");
+
+  // Attempt to parse the last part of the version to check if it can be treated as an integer
+  if (!isNaN(parseInt(splittedVersion[splittedVersion.length - 1]))) {
+    // Can be cast to an int, proceed 'normally'
+    splittedVersion.forEach((v) => {
+      const parsed = parseInt(v, 10);
+      if (!isNaN(parsed)) {
+        retList.push(parsed.toString().padStart(5, "0"));
+      } else {
+        retList.push(v.padStart(5, "0"));
+      }
+    });
+  } else {
+    // Last part of the version cannot be cast to an int
+    // Handle leading up to the last part
+    if (splittedVersion.length > 1) {
+      for (let i = 0; i < splittedVersion.length - 1; i++) {
+        const parsed = parseInt(splittedVersion[i], 10);
+        if (!isNaN(parsed)) {
+          retList.push(parsed.toString().padStart(5, "0"));
+        } else {
+          retList.push(splittedVersion[i].padStart(5, "0"));
+        }
+      }
+    }
+
+    // Handle the last part separately
+    const lastPart = splittedVersion[splittedVersion.length - 1];
+    if (lastPart.length <= 5) {
+      retList.push(lastPart.padStart(5, "0"));
+    } else if (/^\d+$/.test(lastPart)) {
+      // If it's all digits
+      retList.push(parseInt(lastPart, 10).toString().padStart(5, "0"));
+    } else {
+      // Mix of characters and digits or just characters
+      let part = "";
+      lastPart.split("").forEach((char) => {
+        if (/\d/.test(char)) {
+          part += char.padStart(5, "0");
+        } else {
+          part += char;
+        }
+      });
+      retList.push(part.padStart(5, "0"));
+    }
+  }
+
+  return retList.join(".");
+};
+
+// get version number from full cpe string e.g. cpe:2.3:a:analogx:proxy:4.13:*:*:*:*:*:*:* = 4.13
 export const getVersion = (stem: string): string => {
   const cpeList = stem.split(":");
   const version_stem = cpeList[5];
@@ -78,6 +118,7 @@ export const getVersion = (stem: string): string => {
     : version_stem;
 };
 
+// Takes in the CPE match version start/ends to create a query to find matching CPE's according to cpe and versioning
 const createCpeQuery = (cpeUri: CpeUri): Record<string, any> => {
   let query: Record<string, any> = {};
 
@@ -158,13 +199,17 @@ const createCpeQuery = (cpeUri: CpeUri): Record<string, any> => {
   return query;
 };
 
+// DB lookup for CPE's
 const getCpeFromMongo = async (query: Record<string, any>): Promise<any[]> => {
   const db = await connectToDatabase();
   const result = await db.collection("cpes").find(query).toArray();
-  console.log("get cpe from mongo result", result);
   return result;
 };
 
+// This extracts the matched CPE's for a specific CVE.
+// configurations object contains nodes with AND/OR logic to determine which products by themselves or with others
+// are vulnerable. This function extracts the CPE's no matter the logic, and then if a version start/end is provided,
+// does a db lookup for CPE's with that cpe string and version (padded).
 export const determineCveCpes = async (configs: any = []): Promise<Cpes> => {
   let vendors: string[] = [];
   let products: string[] = [];
@@ -213,6 +258,7 @@ export const determineCveCpes = async (configs: any = []): Promise<Cpes> => {
   return { vulnProducts, vulnConfigs, vendors, products };
 };
 
+// get cvss version, base score, and severity from metrics objects
 export const determineCvss = (metrics: Metrics = {}): CvssData[] => {
   const cvss: CvssData[] = [];
 
@@ -233,6 +279,7 @@ export const determineCvss = (metrics: Metrics = {}): CvssData[] => {
   return cvss;
 };
 
+// find the cwe id from weaknesses object e.g. CWE-843
 export const determineCwe = (weaknesses: Weakness[] = []): string => {
   let value = "Unknown"; // Providing default
 

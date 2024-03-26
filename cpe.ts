@@ -2,6 +2,7 @@ import axios from "axios";
 import { getPaddedVersion, getVersion } from "./utils/util";
 import { connectToDatabase } from "./db";
 
+// fetch all parse/store all CPEs from NVD
 export const handleCpes = async (
   base_url: string,
   params: { startIndex: number },
@@ -11,9 +12,10 @@ export const handleCpes = async (
   const db = await connectToDatabase();
   let continueFetching = true;
 
+  // continue to fetch and update pagination params until no records left
   while (continueFetching) {
     try {
-      const response = await axios.get(base_url, { params, timeout: 180000 });
+      const response = await axios.get(base_url, { params, timeout: 60000 });
       if (response.status === 200) {
         const data = response.data;
         const cpes = data.products;
@@ -45,6 +47,7 @@ export const handleCpes = async (
         const total = data.totalResults;
         const fetchedCount = allCpes.length;
 
+        // If to fetch, 6-second delay and continue fetching, otherwise exit
         if (fetchedCount < total) {
           params.startIndex += data.resultsPerPage;
           console.log(`Fetched ${fetchedCount} of ${total} CPES...`);
@@ -62,5 +65,5 @@ export const handleCpes = async (
     }
   }
   console.log(`Successfully fetched ${allCpes.length}. Inserting to DB...`);
-  await db.collection("cpes").insertMany(allCpes);
+  // await db.collection("cpes").insertMany(allCpes);
 };
