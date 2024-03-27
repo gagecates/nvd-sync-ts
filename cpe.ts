@@ -65,5 +65,17 @@ export const handleCpes = async (
     }
   }
   console.log(`Successfully fetched ${allCpes.length}. Inserting to DB...`);
-  // await db.collection("cpes").insertMany(allCpes);
+  // Drop collection first to provide fresh data
+  // List all collections in the database and convert to an array
+  const collections = await db.listCollections().toArray();
+
+  // Check if the collection exists by searching for it by name
+  const collectionExists = collections.some(
+    (collection) => collection.name === "cpes",
+  );
+  if (collectionExists) {
+    const result = await db.collection("cpes").drop();
+    console.log(`Collection cpes dropped:`, result);
+  }
+  await db.collection("cpes").insertMany(allCpes);
 };

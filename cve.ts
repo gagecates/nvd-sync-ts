@@ -84,5 +84,18 @@ export const handleCves = async (
   console.log(
     `Successfully fetched ${allCves.length} CVE's. Inserting to DB...`,
   );
-  // await db.collection("cves").insertMany(allCves);
+  // Drop collection first to provide fresh data
+  // List all collections in the database and convert to an array
+  const collections = await db.listCollections().toArray();
+
+  // Check if the collection exists by searching for it by name
+  const collectionExists = collections.some(
+    (collection) => collection.name === "cves",
+  );
+  if (collectionExists) {
+    const result = await db.collection("cves").drop();
+    console.log(`Collection cves dropped:`, result);
+  }
+
+  await db.collection("cves").insertMany(allCves);
 };
