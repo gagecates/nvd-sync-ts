@@ -53,6 +53,7 @@ export const handleCves = async (
             vulnerableProducts: vulnProducts,
             vendors,
             products,
+            configurations, // storing the raw config object incase we want to flatten and do something with logic here
             published,
             lastModified,
             timestamp: data.timestamp,
