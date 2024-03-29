@@ -15,7 +15,12 @@ export const handleCves = async (
   // continue to fetch and update pagination params until no records left
   while (continueFetching) {
     try {
-      const response = await axios.get(base_url, { params, timeout: 60000 });
+      const response = await axios.get(base_url, {
+        params,
+        timeout: 180000,
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      });
       if (response.status === 200) {
         const data = response.data;
         const cves = data.vulnerabilities;

@@ -202,7 +202,10 @@ const createCpeQuery = (cpeUri: CpeUri): Record<string, any> => {
 // DB lookup for CPE's
 const getCpeFromMongo = async (query: Record<string, any>): Promise<any[]> => {
   const db = await connectToDatabase();
+  const startTime = Date.now();
   const result = await db.collection("cpes").find(query).toArray();
+  const endTime = Date.now();
+  // console.log(`CPE query excution time: ${endTime - startTime} ms`);
   return result;
 };
 

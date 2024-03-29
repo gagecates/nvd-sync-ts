@@ -9,8 +9,8 @@ const params = {
 };
 
 const run = async () => {
-  await handleCpes(CPE_API_URL, params);
-  await handleCves(CVE_API_URL, params);
+  // await handleCpes(CPE_API_URL, params);
+  // await handleCves(CVE_API_URL, params);
 };
 
 run();
